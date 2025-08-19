@@ -1,19 +1,19 @@
 version: '3.8'
 
 services:
-  dbt-core-mcp:
+  dbt-context:
     build:
       context: .
       dockerfile: Dockerfile
-    image: dbt-core-mcp:latest
-    container_name: dbt-core-mcp
+    image: dbt-context-provider:latest
+    container_name: dbt-context-provider
     environment:
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - CACHE_SIZE=${CACHE_SIZE:-1000}
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
+      - GITHUB_REPOSITORY=${GITHUB_REPOSITORY}
+      - DBT_SCHEMA_PATTERNS=${DBT_SCHEMA_PATTERNS:-models/**/*.yml}
+      - DBT_PROJECT_PATH=${DBT_PROJECT_PATH:-dbt_project.yml}
       - CACHE_TTL_MINUTES=${CACHE_TTL_MINUTES:-60}
-      - MCP_SERVER_NAME=${MCP_SERVER_NAME:-dbt-core-mcp}
-    volumes:
-      - cache_data:/app/cache
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
     mem_limit: ${MAX_MEMORY_MB:-512}m
     logging:
@@ -23,6 +23,3 @@ services:
         max-file: "3"
     stdin_open: true
     tty: true
-
-volumes:
-  cache_data:

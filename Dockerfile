@@ -21,7 +21,6 @@ USER dbtmcp
 ENV PATH=/home/dbtmcp/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
-ENV CACHE_SIZE=1000
 ENV CACHE_TTL_MINUTES=60
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

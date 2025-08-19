@@ -38,7 +38,11 @@ pip install -r requirements.txt
 
 ### Configuration
 
-Create a `.env` file with your configuration:
+#### For Claude Desktop
+All configuration is provided directly in `claude_desktop_config.json` - no `.env` file needed (see integration section below).
+
+#### For Local Development/Testing
+Create a `.env` file for local testing with `python test.py`:
 
 ```bash
 # Required
@@ -56,6 +60,54 @@ CACHE_TTL_MINUTES=60               # How often to check for updates
 LOG_LEVEL=INFO
 ```
 
+## Docker Support
+
+### Build the Image
+
+```bash
+docker build -t dbt-context-provider .
+```
+
+### Run with Docker
+
+```bash
+# Using environment variables directly
+docker run --rm \
+  -e GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token \
+  -e GITHUB_REPOSITORY=YourOrg/your-repo \
+  -e DBT_SCHEMA_PATTERNS="models/**/*.yml" \
+  dbt-context-provider
+
+# Or using an .env file
+docker run --rm --env-file .env dbt-context-provider
+```
+
+### Using docker-compose
+
+Create a `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  dbt-context:
+    build: .
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
+      - GITHUB_REPOSITORY=${GITHUB_REPOSITORY}
+      - DBT_SCHEMA_PATTERNS=${DBT_SCHEMA_PATTERNS:-models/**/*.yml}
+      - CACHE_TTL_MINUTES=${CACHE_TTL_MINUTES:-60}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+```
+
+Then run:
+```bash
+# With .env file
+docker-compose up
+
+# Or with inline environment variables
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_token GITHUB_REPOSITORY=YourOrg/repo docker-compose up
+```
+
 ## Claude Desktop Integration
 
 Add to your Claude Desktop configuration file:
@@ -71,6 +123,24 @@ Add to your Claude Desktop configuration file:
     "dbt-context": {
       "command": "python",
       "args": ["/path/to/dbt-core-mcp/main.py"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
+        "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
+        "DBT_SCHEMA_PATTERNS": "models/**/*.yml"
+      }
+    }
+  }
+}
+```
+
+### Using Docker in Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "dbt-context": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "dbt-context-provider"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
@@ -256,13 +326,37 @@ The `DBT_SCHEMA_PATTERNS` environment variable supports various glob patterns:
 
 ## Development
 
-### Running Tests
+### Testing Without Claude
+
+You have several options for local testing:
+
+#### Option 1: Using .env file
+```bash
+cp .env.example .env
+# Edit .env with your GitHub token and repository
+python test.py
+```
+
+#### Option 2: Using environment variables directly
+```bash
+export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token
+export GITHUB_REPOSITORY=YourOrg/your-repo
+export DBT_SCHEMA_PATTERNS="models/**/*.yml"
+python test.py
+```
+
+#### Option 3: Using Docker
+```bash
+docker run --rm \
+  -e GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token \
+  -e GITHUB_REPOSITORY=YourOrg/your-repo \
+  -e DBT_SCHEMA_PATTERNS="models/**/*.yml" \
+  dbt-context-provider python test.py
+```
+
+### Running Unit Tests
 
 ```bash
-# Test the server locally (without Claude)
-python test.py
-
-# Run unit tests
 pytest tests/
 ```
 

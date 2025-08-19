@@ -1,88 +1,66 @@
 #!/usr/bin/env python3
-import asyncio
-import logging
+"""
+Main entry point for FastMCP-based dbt context provider.
+"""
+
 import os
 import sys
-import argparse
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
-from src.server import DbtMCPServer
-from src.cache import reset_global_cache
 
+# Load environment variables
 load_dotenv()
 
+# Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="dbt-core-mcp: Universal MCP server for dbt project analysis"
-    )
-    parser.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default=os.getenv("LOG_LEVEL", "INFO"),
-        help="Set the logging level"
-    )
-    parser.add_argument(
-        "--cache-size",
-        type=int,
-        default=int(os.getenv("CACHE_SIZE", "1000")),
-        help="Maximum number of items to cache"
-    )
-    parser.add_argument(
-        "--cache-ttl",
-        type=int,
-        default=int(os.getenv("CACHE_TTL_MINUTES", "60")),
-        help="Cache TTL in minutes"
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version="dbt-core-mcp 1.0.0"
-    )
-    parser.add_argument(
-        "--dev",
-        action="store_true",
-        help="Run in development mode with verbose logging"
-    )
+def validate_environment():
+    """Validate required environment variables."""
+    required = [
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "GITHUB_REPOSITORY"
+    ]
     
-    return parser.parse_args()
-
-
-async def main():
-    args = parse_arguments()
+    missing = [var for var in required if not os.getenv(var)]
     
-    logging.getLogger().setLevel(getattr(logging, args.log_level))
-    
-    if args.dev:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logger.debug("Running in development mode")
-    
-    logger.info(f"Starting dbt-core-mcp server")
-    logger.info(f"Cache size: {args.cache_size}, TTL: {args.cache_ttl} minutes")
-    
-    try:
-        server = DbtMCPServer()
-        logger.info("Server initialized successfully")
-        await server.run()
-    except KeyboardInterrupt:
-        logger.info("Server shutdown requested")
-    except Exception as e:
-        logger.error(f"Server error: {e}", exc_info=True)
+    if missing:
+        logger.error(f"Missing required environment variables: {', '.join(missing)}")
+        logger.error("Please set these in your .env file or environment")
         sys.exit(1)
-    finally:
-        reset_global_cache()
-        logger.info("Server stopped")
+    
+    # Log configuration
+    logger.info(f"Repository: {os.getenv('GITHUB_REPOSITORY')}")
+    logger.info(f"Schema patterns: {os.getenv('DBT_SCHEMA_PATTERNS', 'models/**/*.yml')}")
+    logger.info(f"Project path: {os.getenv('DBT_PROJECT_PATH', 'dbt_project.yml')}")
+    logger.info(f"Cache TTL: {os.getenv('CACHE_TTL_MINUTES', '60')} minutes")
+
+
+def main():
+    """Main entry point."""
+    logger.info("Starting dbt-context-provider MCP server...")
+    
+    # Validate environment
+    validate_environment()
+    
+    # Import and run the FastMCP app
+    from src.server import mcp
+    
+    # Run the FastMCP server
+    mcp.run()
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
+    except KeyboardInterrupt:
+        logger.info("Server shutdown requested")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)

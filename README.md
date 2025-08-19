@@ -1,359 +1,293 @@
-# dbt-core-mcp
+# dbt-context-provider
 
-A generic, open-source MCP (Model Context Protocol) server for parsing and analyzing dbt projects. This server works with any dbt repository structure and provides rich metadata access for AI-powered analysis workflows.
+A FastMCP-based context provider that delivers rich database structure information from dbt projects to LLMs. Automatically syncs with GitHub repositories to provide always-fresh dbt metadata for intelligent SQL query generation.
 
 ## Overview
 
-`dbt-core-mcp` is a Python-based MCP server that:
-- Parses dbt project files (`dbt_project.yml`, `schema.yml`) through Claude's file access
-- Structures and indexes dbt metadata for efficient querying
-- Provides comprehensive model information via MCP tools
-- Works with any dbt project structure (staging/intermediate/marts patterns)
-- Integrates seamlessly with warehouse-specific MCP servers (BigQuery, Snowflake, etc.)
+`dbt-context-provider` is a specialized MCP server that:
+- 🔄 **Auto-syncs** with GitHub repositories to fetch dbt project files
+- 📊 **Provides rich context** about database structure, models, columns, and relationships
+- 🎯 **Focuses on context** - designed to work alongside SQL execution servers
+- 🚀 **Built with FastMCP** for simple, efficient tool and prompt definitions
+- ⚡ **Smart caching** with configurable TTL for optimal performance
 
-## Features
+## Key Features
 
-- **Universal Compatibility**: Works with any dbt project structure
-- **Warehouse Agnostic**: Supports BigQuery, Snowflake, Postgres, Redshift, Databricks, and more
-- **Rich Metadata Access**: Full access to models, columns, tests, tags, and configurations
-- **Smart Search**: Search across names, descriptions, columns, and tags
-- **Lineage Tracking**: Extract model dependencies and relationships
-- **Performance Optimized**: In-memory caching with configurable TTL
-- **Production Ready**: Docker support, health checks, and comprehensive logging
+- **Repository-Specific Configuration**: Each instance targets specific dbt models via glob patterns
+- **Automatic GitHub Sync**: Fetches and caches dbt files, refreshing based on TTL
+- **Context-Optimized Tools**: Purpose-built tools for providing database context to LLMs
+- **Rich Model Information**: Complete details on columns, data types, tests, and relationships
+- **Intelligent Search**: Find relevant models and columns for query construction
+- **Lineage Tracking**: Understand data flow and dependencies
 
-## Quick Start
+## Installation
 
-### Installation
+### Prerequisites
 
-#### Using Docker (Recommended)
+- Python 3.8+
+- GitHub Personal Access Token with repository read access
+- Target dbt repository on GitHub
 
-```bash
-docker pull ghcr.io/funnelenvy/dbt-core-mcp:latest
-docker run -d --name dbt-core-mcp ghcr.io/funnelenvy/dbt-core-mcp:latest
-```
-
-#### Using pip
-
-```bash
-pip install dbt-core-mcp
-dbt-core-mcp
-```
-
-#### From Source
+### From Source
 
 ```bash
 git clone https://github.com/FunnelEnvy/dbt-core-mcp.git
 cd dbt-core-mcp
 pip install -r requirements.txt
-python main.py
 ```
 
-### Claude Desktop Integration
+### Configuration
 
-Add to your Claude Desktop configuration:
+Create a `.env` file with your configuration:
+
+```bash
+# Required
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token_here
+GITHUB_REPOSITORY=YourOrg/your-dbt-repo
+
+# Schema patterns (glob patterns supported)
+DBT_SCHEMA_PATTERNS=models/**/*.yml
+# Or target specific directories:
+# DBT_SCHEMA_PATTERNS=models/marts/forecasting/*.yml,models/marts/reform/*.yml
+
+# Optional
+DBT_PROJECT_PATH=dbt_project.yml  # Path to dbt_project.yml
+CACHE_TTL_MINUTES=60               # How often to check for updates
+LOG_LEVEL=INFO
+```
+
+## Claude Desktop Integration
+
+Add to your Claude Desktop configuration file:
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+### Single Repository Configuration
 
 ```json
 {
   "mcpServers": {
-    "dbt-core-mcp": {
+    "dbt-context": {
       "command": "python",
-      "args": ["/path/to/dbt-core-mcp/main.py"]
+      "args": ["/path/to/dbt-core-mcp/main.py"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
+        "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
+        "DBT_SCHEMA_PATTERNS": "models/**/*.yml"
+      }
     }
   }
 }
 ```
 
-Or with Docker:
+### Multiple Focused Configurations
+
+Run multiple instances for different model subsets:
 
 ```json
 {
   "mcpServers": {
-    "dbt-core-mcp": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", "ghcr.io/funnelenvy/dbt-core-mcp:latest"]
+    "dbt-forecasting": {
+      "command": "python",
+      "args": ["/path/to/dbt-core-mcp/main.py"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
+        "GITHUB_REPOSITORY": "FunnelEnvy/funnelenvy_dbt",
+        "DBT_SCHEMA_PATTERNS": "models/marts/forecasting/*.yml"
+      }
+    },
+    "dbt-reform": {
+      "command": "python",
+      "args": ["/path/to/dbt-core-mcp/main.py"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
+        "GITHUB_REPOSITORY": "FunnelEnvy/funnelenvy_dbt",
+        "DBT_SCHEMA_PATTERNS": "models/marts/reform/*.yml"
+      }
     }
   }
 }
 ```
 
-## Supported dbt Patterns
+## Available Tools
 
-### Project Structures
-- Standard layouts (staging → intermediate → marts)
-- Multiple schema files per directory
-- Nested folder organizations
-- Custom folder structures
+### `get_database_context()`
+Returns comprehensive database structure overview including all models, schemas, and relationships. Automatically refreshes from GitHub if cache is stale.
 
-### dbt Features
-- All materialization types (table, view, incremental, ephemeral, snapshot)
-- Column-level documentation and tests
-- Model configurations and meta fields
-- Tags for organization
-- Sources, exposures, and metrics
-- Custom tests and constraints
-- Pre/post hooks and grants
-
-## Available MCP Tools
-
-### parse_dbt_project
-Parse a `dbt_project.yml` file to understand project structure.
-
-**Input:**
-- `dbt_project_yml_content`: The content of dbt_project.yml file
-
-**Output:**
-- Project metadata including name, version, profile
-- Model configuration hierarchy
-- Variable definitions
-- Inferred warehouse type
-
-### parse_dbt_schema
-Parse a `schema.yml` file to extract model definitions.
-
-**Input:**
-- `schema_yml_content`: The content of schema.yml file
-- `project_context` (optional): Project configuration context
-
-**Output:**
-- Parsed models with columns, tests, and configurations
-- Sources, exposures, and metrics
-- Comprehensive metadata for each model
-
-### get_model_info
-Get detailed information about a specific dbt model.
-
-**Input:**
-- `model_name`: The name of the dbt model
-
-**Output:**
-- Complete model details including columns, tests, tags
-- Documentation coverage
-- Test coverage by column
-- Lineage relationships
-
-### search_models
-Search models by name, description, columns, tags, or meta fields.
-
-**Input:**
-- `query`: Search query string
-- `filters` (optional): Filter by tags, schema, or materialization
-
-**Output:**
-- Ranked search results
-- Relevance scoring
-- Filtered by specified criteria
-
-### list_datasets
-Show how models map to warehouse datasets/schemas.
-
-**Input:**
-- `warehouse_type` (optional): bigquery, snowflake, postgres, etc.
-
-**Output:**
-- Dataset/schema organization
-- Model groupings by dataset
-- Warehouse-specific mappings
-
-### get_model_lineage
-Extract lineage relationships for a model.
-
-**Input:**
-- `model_name`: The name of the model
-- `depth` (optional): Depth of lineage traversal (1-5)
-
-**Output:**
-- Upstream dependencies (refs and sources)
-- Downstream dependents
-- Dependency depth
-
-### list_model_tags
-Discover organizational patterns through tags.
-
-**Output:**
-- All tags used across models
-- Model counts per tag
-- Tag-based organization insights
-
-### get_models_by_materialization
-Find models by materialization type.
-
-**Input:**
-- `materialization_type`: table, view, incremental, etc.
-
-**Output:**
-- Models using specified materialization
-- Configuration details
-- Schema and database locations
-
-## Example Workflows
-
-### Basic Analysis Workflow
-
+**Example Response:**
 ```
-User: "Get the dbt_project.yml from github.com/myorg/analytics-dbt"
-→ GitHub MCP fetches the project file
+# Database Context: YourOrg/your-dbt-repo
+Total Models: 47
+Total Sources: 12
 
-User: "Parse this dbt project and show me the structure"
-→ dbt-core-mcp parses and returns project organization
-
-User: "Get all schema.yml files from the models directory"
-→ GitHub MCP fetches schema files
-
-User: "Parse these schemas and search for customer-related models"
-→ dbt-core-mcp parses schemas and searches for 'customer' models
-
-User: "Show me the lineage for customer_summary model"
-→ dbt-core-mcp returns upstream and downstream dependencies
+## Schemas (4):
+- staging: 15 models
+- intermediate: 12 models
+- marts: 20 models
 ```
 
-### Integration with Warehouse MCP
+### `get_model_context(model_name: str)`
+Get detailed information about a specific model including columns, data types, tests, and documentation.
 
-```
-User: "Parse the dbt project to understand the data model"
-→ dbt-core-mcp provides model metadata
-
-User: "Query the customer_dim table with proper column context"
-→ BigQuery MCP uses dbt metadata for intelligent querying
-
-User: "Which columns in customer_dim have data quality tests?"
-→ dbt-core-mcp returns tested columns with test details
+**Example:**
+```python
+get_model_context("customer_summary")
 ```
 
-## Configuration
+### `search_models(query: str, filters: Optional)`
+Search for models by name, description, columns, or tags. Supports filtering by schema, tags, or materialization.
 
-### Environment Variables
-
-```bash
-# Cache settings
-CACHE_SIZE=1000              # Maximum cached items
-CACHE_TTL_MINUTES=60         # Cache expiration time
-
-# Server settings
-LOG_LEVEL=INFO               # Logging level (DEBUG, INFO, WARNING, ERROR)
-MCP_SERVER_NAME=dbt-core-mcp # Server identifier
-
-# Performance tuning
-MAX_MEMORY_MB=512            # Memory limit for Docker
-ENABLE_CACHE_WARMING=false   # Pre-load cache on startup
+**Example:**
+```python
+search_models("revenue", filter_schema="marts")
 ```
 
-### Command Line Arguments
+### `get_model_lineage(model_name: str)`
+Understand data flow with upstream and downstream dependencies.
 
-```bash
-python main.py --log-level DEBUG --cache-size 2000 --cache-ttl 120
+### `get_column_info(model_name: str, column_name: str)`
+Get detailed column information including data type, constraints, tests, and documentation.
+
+### `list_available_models(schema_filter: Optional[str])`
+List all models, optionally filtered by schema.
+
+### `refresh_context()`
+Manually trigger a refresh from GitHub (normally automatic based on TTL).
+
+## Prompts
+
+### `database_overview`
+Provides a high-level introduction to the database structure and available commands.
+
+### `sql_helper(query_intent: str)`
+Gets database context relevant to a specific SQL query intent, suggesting relevant models and columns.
+
+## Usage Examples
+
+### Basic Workflow
+
+1. **User**: "I need to write a query to analyze customer revenue"
+
+2. **Claude** calls `search_models("customer revenue")`:
+   ```
+   Found 3 models:
+   - customer_summary (marts): Customer aggregated metrics
+   - revenue_daily (marts): Daily revenue by customer
+   - customer_orders (intermediate): Customer order history
+   ```
+
+3. **Claude** calls `get_model_context("revenue_daily")`:
+   ```
+   Model: revenue_daily
+   Columns:
+   - customer_id (string): Unique customer identifier
+   - date (date): Revenue date
+   - revenue_amount (numeric): Total revenue
+   - order_count (integer): Number of orders
+   ```
+
+4. **Claude** generates SQL with correct table and column names
+
+### Understanding Data Flow
+
+```python
+# Check dependencies
+get_model_lineage("customer_summary")
+
+# Response:
+Upstream Dependencies:
+- customer_orders
+- customer_attributes
+
+Downstream Dependencies:
+- executive_dashboard
+- customer_segments
 ```
+
+## Glob Pattern Support
+
+The `DBT_SCHEMA_PATTERNS` environment variable supports various glob patterns:
+
+- `models/**/*.yml` - All YAML files under models (recursive)
+- `models/marts/*.yml` - All YAML files in marts directory
+- `models/*/schema.yml` - Schema.yml in any subdirectory
+- `models/marts/finance/*.yml,models/marts/marketing/*.yml` - Multiple specific paths
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────┐
+│   Claude    │────▶│ dbt-context-     │────▶│ GitHub  │
+│             │     │ provider         │     │  Repo   │
+└─────────────┘     └──────────────────┘     └─────────┘
+       │                     │
+       │                     ├─── Auto-fetch on startup
+       │                     ├─── Cache with TTL
+       │                     └─── Refresh on demand
+       │
+       ▼
+┌─────────────┐
+│ SQL Execute │
+│ MCP Server  │
+└─────────────┘
+```
+
+## Performance
+
+- **Smart Caching**: Files are cached with configurable TTL (default 60 minutes)
+- **Selective Fetching**: Only fetches files matching configured patterns
+- **Lazy Loading**: Syncs on startup, then only when cache expires
+- **Efficient Search**: In-memory indices for fast model and column searches
+
+## Troubleshooting
+
+### GitHub Authentication Issues
+- Ensure your PAT has repository read access
+- Test with: `curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user`
+
+### Pattern Matching
+- Use `DBT_SCHEMA_PATTERNS=models/` to test with a smaller subset first
+- Check logs to see which files are being fetched
+
+### Cache Issues
+- Set `CACHE_TTL_MINUTES=1` for development to force frequent refreshes
+- Use `refresh_context()` tool to manually trigger sync
 
 ## Development
-
-### Setup Development Environment
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/dbt-core-mcp.git
-cd dbt-core-mcp
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run in development mode
-python main.py --dev
-```
 
 ### Running Tests
 
 ```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-cov
+# Test the server locally (without Claude)
+python test.py
 
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=src --cov-report=html
-
-# Run specific test file
-pytest tests/test_parser.py
+# Run unit tests
+pytest tests/
 ```
 
-### Building Docker Image
+### Debug Mode
 
 ```bash
-# Build the image
-docker build -t dbt-core-mcp:latest .
-
-# Run the container
-docker run --rm -it dbt-core-mcp:latest
-
-# With custom configuration
-docker run --rm -it \
-  -e LOG_LEVEL=DEBUG \
-  -e CACHE_SIZE=2000 \
-  dbt-core-mcp:latest
+LOG_LEVEL=DEBUG python main.py
 ```
 
-## API Reference
+## Limitations
 
-### Tool Schemas
-
-Each tool accepts JSON input and returns structured JSON output. See the [API Documentation](docs/api.md) for detailed schemas.
-
-### Error Handling
-
-All tools return descriptive error messages:
-- Invalid YAML format
-- Model not found
-- Missing required fields
-- Cache errors
-
-### Performance Considerations
-
-- Parsing large projects: Use incremental parsing for projects with many schema files
-- Cache management: Adjust CACHE_SIZE based on project size
-- Memory usage: Monitor with get_memory_usage_estimate()
-- Search performance: Indexed for fast lookups
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Process
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with tests
-4. Submit a pull request
-
-### Code Standards
-
-- Follow PEP 8 style guidelines
-- Add type hints to all functions
-- Include docstrings for public methods
-- Write tests for new features
+- Requires dbt files to be in a GitHub repository
+- Does not execute SQL queries (use a separate SQL MCP server)
+- Limited to files matching configured patterns
+- Cache TTL applies to all files (no per-file refresh)
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## Contributing
+
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/FunnelEnvy/dbt-core-mcp/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/FunnelEnvy/dbt-core-mcp/discussions)
-- **Documentation**: [Full Documentation](https://funnelenvy.github.io/dbt-core-mcp)
-
-## Roadmap
-
-- [ ] Support for dbt Cloud API integration
-- [ ] Advanced lineage visualization
-- [ ] SQL parsing for deeper lineage extraction
-- [ ] Integration with dbt test results
-- [ ] Support for custom dbt macros
-- [ ] Real-time file watching mode
-- [ ] Multi-project support
-
-## Acknowledgments
-
-Built with the [MCP Python SDK](https://github.com/anthropics/mcp-python) by Anthropic.

@@ -44,7 +44,7 @@ async def test_local():
     
     # Import server components
     try:
-        from src.server_fastmcp import (
+        from src.server import (
             initialize_github,
             sync_from_github,
             registry,
@@ -70,7 +70,7 @@ async def test_local():
             print(f"✅ Sync successful!")
             
             # Access the global registry
-            from src.server_fastmcp import registry
+            from src.server import registry
             if registry:
                 print(f"   Loaded {len(registry.project.models)} models")
                 print(f"   Loaded {len(registry.project.sources)} sources")

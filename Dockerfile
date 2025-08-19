@@ -1,11 +1,11 @@
-FROM python:3.11-slim as builder
+FROM python:3.10-slim as builder
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 RUN useradd -m -u 1000 dbtmcp && \
     mkdir -p /app && \

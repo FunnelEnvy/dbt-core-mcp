@@ -24,7 +24,7 @@ A FastMCP-based context provider that delivers rich database structure informati
 
 ### Prerequisites
 
-- Python 3.8+ (if running from source)
+- Python 3.10+ (if running from source) - required for FastMCP
 - Docker (if using container)
 - GitHub Personal Access Token with repository read access
 - Target dbt repository on GitHub

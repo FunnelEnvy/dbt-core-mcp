@@ -2,10 +2,15 @@ version: '3.8'
 
 services:
   dbt-context:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: dbt-context-provider:latest
+    # Use pre-built image from GitHub Container Registry
+    image: ghcr.io/funnelenvy/dbt-core-mcp:latest
+    
+    # To build locally instead, uncomment these lines:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    # image: dbt-context-provider:latest
+    
     container_name: dbt-context-provider
     environment:
       - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}

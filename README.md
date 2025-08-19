@@ -24,9 +24,16 @@ A FastMCP-based context provider that delivers rich database structure informati
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.8+ (if running from source)
+- Docker (if using container)
 - GitHub Personal Access Token with repository read access
 - Target dbt repository on GitHub
+
+### Quick Start (Docker)
+
+```bash
+docker pull ghcr.io/funnelenvy/dbt-core-mcp:latest
+```
 
 ### From Source
 
@@ -62,24 +69,31 @@ LOG_LEVEL=INFO
 
 ## Docker Support
 
-### Build the Image
+### Quick Start with Pre-built Image
+
+Use our pre-built image from GitHub Container Registry - no build required!
 
 ```bash
-docker build -t dbt-context-provider .
-```
+# Pull the latest image
+docker pull ghcr.io/funnelenvy/dbt-core-mcp:latest
 
-### Run with Docker
-
-```bash
-# Using environment variables directly
+# Run with your configuration
 docker run --rm \
   -e GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token \
   -e GITHUB_REPOSITORY=YourOrg/your-repo \
   -e DBT_SCHEMA_PATTERNS="models/**/*.yml" \
-  dbt-context-provider
+  ghcr.io/funnelenvy/dbt-core-mcp:latest
 
 # Or using an .env file
-docker run --rm --env-file .env dbt-context-provider
+docker run --rm --env-file .env ghcr.io/funnelenvy/dbt-core-mcp:latest
+```
+
+### Build Your Own Image (Optional)
+
+If you want to build the image locally:
+
+```bash
+docker build -t dbt-context-provider .
 ```
 
 ### Using docker-compose
@@ -140,7 +154,10 @@ Add to your Claude Desktop configuration file:
   "mcpServers": {
     "dbt-context": {
       "command": "docker",
-      "args": ["run", "--rm", "-i", "dbt-context-provider"],
+      "args": [
+        "run", "--rm", "-i",
+        "ghcr.io/funnelenvy/dbt-core-mcp:latest"
+      ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
@@ -351,7 +368,7 @@ docker run --rm \
   -e GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token \
   -e GITHUB_REPOSITORY=YourOrg/your-repo \
   -e DBT_SCHEMA_PATTERNS="models/**/*.yml" \
-  dbt-context-provider python test.py
+  ghcr.io/funnelenvy/dbt-core-mcp:latest python test.py
 ```
 
 ### Running Unit Tests

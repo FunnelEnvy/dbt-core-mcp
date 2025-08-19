@@ -137,3 +137,6 @@ Thumbs.db
 cache/
 *.cache
 .cache_*
+
+# Claude Desktop local settings
+.claude/settings.local.json

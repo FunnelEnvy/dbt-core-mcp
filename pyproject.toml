@@ -46,10 +46,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/dbt-core-mcp"
-Documentation = "https://your-org.github.io/dbt-core-mcp"
-Repository = "https://github.com/your-org/dbt-core-mcp.git"
-Issues = "https://github.com/your-org/dbt-core-mcp/issues"
+Homepage = "https://github.com/FunnelEnvy/dbt-core-mcp"
+Documentation = "https://funnelenvy.github.io/dbt-core-mcp"
+Repository = "https://github.com/FunnelEnvy/dbt-core-mcp.git"
+Issues = "https://github.com/FunnelEnvy/dbt-core-mcp/issues"
 
 [project.scripts]
 dbt-core-mcp = "main:main"

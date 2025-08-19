@@ -28,8 +28,8 @@ A generic, open-source MCP (Model Context Protocol) server for parsing and analy
 #### Using Docker (Recommended)
 
 ```bash
-docker pull ghcr.io/your-org/dbt-core-mcp:latest
-docker run -d --name dbt-core-mcp ghcr.io/your-org/dbt-core-mcp:latest
+docker pull ghcr.io/funnelenvy/dbt-core-mcp:latest
+docker run -d --name dbt-core-mcp ghcr.io/funnelenvy/dbt-core-mcp:latest
 ```
 
 #### Using pip
@@ -42,7 +42,7 @@ dbt-core-mcp
 #### From Source
 
 ```bash
-git clone https://github.com/your-org/dbt-core-mcp.git
+git clone https://github.com/FunnelEnvy/dbt-core-mcp.git
 cd dbt-core-mcp
 pip install -r requirements.txt
 python main.py
@@ -70,7 +70,7 @@ Or with Docker:
   "mcpServers": {
     "dbt-core-mcp": {
       "command": "docker",
-      "args": ["run", "--rm", "-i", "ghcr.io/your-org/dbt-core-mcp:latest"]
+      "args": ["run", "--rm", "-i", "ghcr.io/funnelenvy/dbt-core-mcp:latest"]
     }
   }
 }
@@ -340,9 +340,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/dbt-core-mcp/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/dbt-core-mcp/discussions)
-- **Documentation**: [Full Documentation](https://your-org.github.io/dbt-core-mcp)
+- **Issues**: [GitHub Issues](https://github.com/FunnelEnvy/dbt-core-mcp/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/FunnelEnvy/dbt-core-mcp/discussions)
+- **Documentation**: [Full Documentation](https://funnelenvy.github.io/dbt-core-mcp)
 
 ## Roadmap
 

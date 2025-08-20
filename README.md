@@ -67,6 +67,7 @@ DBT_SCHEMA_PATTERNS=models/**/*.yml
 DBT_PROJECT_PATH=dbt_project.yml  # Path to dbt_project.yml
 DBT_PROFILES_PATH=profiles.yml    # Path to profiles.yml
 DBT_TARGET=prod                   # Target to use from profiles.yml (default: prod)
+DBT_SCHEMA_OVERRIDE=schema_name   # Override schema/dataset (for custom generate_schema_name)
 CACHE_TTL_MINUTES=60               # How often to check for updates
 LOG_LEVEL=INFO
 ```
@@ -334,6 +335,42 @@ The `DBT_SCHEMA_PATTERNS` environment variable supports various glob patterns:
 - `models/marts/*.yml` - All YAML files in marts directory
 - `models/*/schema.yml` - Schema.yml in any subdirectory
 - `models/marts/finance/*.yml,models/marts/marketing/*.yml` - Multiple specific paths
+
+## Custom Schema Names (generate_schema_name)
+
+If your dbt project uses a custom `generate_schema_name` macro that doesn't follow dbt's default pattern, use `DBT_SCHEMA_OVERRIDE` to specify the actual database/dataset where your tables exist.
+
+### When to use DBT_SCHEMA_OVERRIDE
+
+Use this when your `generate_schema_name` macro:
+- Uses custom schema names directly in production (e.g., `marts_forecasting` instead of `dbt_marts_forecasting`)
+- Has environment-specific logic that changes schema names
+- Implements any non-standard schema naming pattern
+
+### Example
+
+If your macro looks like this:
+```sql
+{% macro generate_schema_name(custom_schema_name, node) -%}
+    {%- if target.name == "prod" -%}
+        {{ custom_schema_name | trim }}  -- Uses custom name directly
+    {%- else -%}
+        {{ target.schema }}_{{ custom_schema_name | trim }}
+    {%- endif -%}
+{%- endmacro %}
+```
+
+Then in production, models with `+schema: marts_forecasting` will be in the `marts_forecasting` dataset/schema, not `dbt_marts_forecasting`.
+
+Set the override in your configuration:
+```json
+"env": {
+  "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
+  "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
+  "DBT_SCHEMA_PATTERNS": "models/marts/forecasting/*.yml",
+  "DBT_SCHEMA_OVERRIDE": "marts_forecasting"
+}
+```
 
 ## Architecture
 

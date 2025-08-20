@@ -63,6 +63,11 @@ def initialize_github():
     logger.info(f"Project path: {project_path}")
     logger.info(f"Profiles path: {profiles_path}")
     logger.info(f"Target: {target_name}")
+    
+    # Check for schema override
+    schema_override = os.getenv("DBT_SCHEMA_OVERRIDE")
+    if schema_override:
+        logger.info(f"Schema override: {schema_override}")
 
 
 async def fetch_from_github(path: str) -> Optional[str]:
@@ -259,8 +264,12 @@ async def get_database_context(ctx: Context) -> str:
     model_config = registry.project.config.models or {}
     dataset_info = None
     
-    # Will be populated from profiles.yml parsing
-    if hasattr(registry, 'profile_config') and registry.profile_config:
+    # First check for schema override
+    schema_override = os.getenv("DBT_SCHEMA_OVERRIDE")
+    if schema_override:
+        dataset_info = schema_override
+    # Otherwise get from profiles.yml parsing
+    elif hasattr(registry, 'profile_config') and registry.profile_config:
         dataset_info = registry.profile_config.get('dataset') or registry.profile_config.get('database')
     
     # Otherwise look for dataset configuration in project
@@ -341,7 +350,11 @@ async def get_model_context(ctx: Context, model_name: str) -> str:
     dataset = None
     schema = model.config.schema or 'default'
     
-    if hasattr(registry, 'profile_config') and registry.profile_config:
+    # First check for schema override environment variable
+    schema_override = os.getenv("DBT_SCHEMA_OVERRIDE")
+    if schema_override:
+        dataset = schema_override
+    elif hasattr(registry, 'profile_config') and registry.profile_config:
         # Different databases use different terms
         dataset = registry.profile_config.get('dataset')  # BigQuery
         if not dataset:
@@ -349,8 +362,8 @@ async def get_model_context(ctx: Context, model_name: str) -> str:
         if not dataset:
             dataset = registry.profile_config.get('schema')  # Some configs
     
-    # Override with model-specific database if set
-    if model.config.database:
+    # Override with model-specific database if set (unless schema override is active)
+    if not schema_override and model.config.database:
         dataset = model.config.database
     
     # Check for dataset in various locations in project config if still not found
@@ -679,9 +692,13 @@ async def database_overview(ctx: Context) -> str:
     if not registry:
         return "No database context available."
     
-    # Get dataset/database info from profile
+    # Get dataset/database info from profile or override
     dataset_info = ""
-    if hasattr(registry, 'profile_config') and registry.profile_config:
+    schema_override = os.getenv("DBT_SCHEMA_OVERRIDE")
+    
+    if schema_override:
+        dataset_info = f"\nSchema Override: **{schema_override}** (using custom generate_schema_name)"
+    elif hasattr(registry, 'profile_config') and registry.profile_config:
         profile_type = registry.profile_config.get('type', '').lower()
         if profile_type == 'bigquery':
             dataset = registry.profile_config.get('dataset')

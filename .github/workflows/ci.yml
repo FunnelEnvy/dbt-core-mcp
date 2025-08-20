@@ -52,9 +52,4 @@ jobs:
           -e GITHUB_PERSONAL_ACCESS_TOKEN=test_token \
           -e GITHUB_REPOSITORY=test/repo \
           -e LOG_LEVEL=DEBUG \
-          dbt-core-mcp:test python -c "
-import sys
-from src.server import mcp
-print('Docker image built and FastMCP initialized successfully')
-sys.exit(0)
-"
+          dbt-core-mcp:test python -c "import sys; from src.server import mcp; print('Docker image built and FastMCP initialized successfully'); sys.exit(0)"

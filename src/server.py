@@ -200,8 +200,14 @@ def should_refresh() -> bool:
 
 async def ensure_fresh_context():
     """Ensure context is fresh, syncing if needed."""
-    if should_refresh():
-        await sync_from_github()
+    global registry
+    
+    # First-time sync or refresh needed
+    if not registry or should_refresh():
+        success = await sync_from_github()
+        if not success and not registry:
+            # If initial sync fails and we have no data, raise error
+            raise Exception("Failed to sync from GitHub. Please check your configuration.")
 
 
 # ============= FastMCP Tools =============
@@ -626,30 +632,14 @@ async def sql_helper(ctx: Context, query_intent: str) -> str:
     return "\n".join(output)
 
 
-# ============= Startup and Shutdown =============
+# ============= Startup =============
+# Note: FastMCP doesn't have startup/shutdown decorators
+# Initialize synchronously on module import
 
-@mcp.startup()
-async def startup():
-    """Initialize GitHub connection and perform initial sync."""
-    logger.info("Starting dbt-context-provider MCP server...")
-    
-    try:
-        initialize_github()
-        success = await sync_from_github()
-        
-        if success:
-            logger.info(f"Successfully loaded {len(registry.project.models) if registry else 0} models")
-        else:
-            logger.warning("Initial sync failed. Will retry on first request.")
-            
-    except Exception as e:
-        logger.error(f"Startup error: {e}")
-        # Don't fail completely - allow manual refresh later
+try:
+    initialize_github()
+    logger.info("GitHub client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize GitHub client: {e}")
+    # Continue anyway - tools will handle the error
 
-
-@mcp.shutdown()
-async def shutdown():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down dbt-context-provider...")
-    if cache_manager:
-        cache_manager.clear_cache()

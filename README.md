@@ -63,6 +63,7 @@ DBT_SCHEMA_PATTERNS=models/**/*.yml
 
 # Optional
 DBT_PROJECT_PATH=dbt_project.yml  # Path to dbt_project.yml
+BIGQUERY_DATASET=your_dataset     # BigQuery dataset name (for BigQuery projects)
 CACHE_TTL_MINUTES=60               # How often to check for updates
 LOG_LEVEL=INFO
 ```
@@ -140,7 +141,8 @@ Add to your Claude Desktop configuration file:
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
-        "DBT_SCHEMA_PATTERNS": "models/**/*.yml"
+        "DBT_SCHEMA_PATTERNS": "models/**/*.yml",
+        "BIGQUERY_DATASET": "your_dataset"
       }
     }
   }
@@ -169,7 +171,8 @@ Add to your Claude Desktop configuration file:
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
-        "DBT_SCHEMA_PATTERNS": "models/**/*.yml"
+        "DBT_SCHEMA_PATTERNS": "models/**/*.yml",
+        "BIGQUERY_DATASET": "your_dataset"
       }
     }
   }

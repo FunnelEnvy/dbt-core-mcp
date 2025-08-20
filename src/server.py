@@ -232,10 +232,10 @@ async def get_database_context(ctx: Context) -> str:
     
     # Extract dataset configuration
     model_config = registry.project.config.models or {}
-    dataset_info = None
+    dataset_info = os.getenv("BIGQUERY_DATASET")  # Check env var first
     
-    # Look for dataset configuration
-    if 'marts' in model_config and isinstance(model_config['marts'], dict):
+    # If not in env, look for dataset configuration in project
+    if not dataset_info and 'marts' in model_config and isinstance(model_config['marts'], dict):
         marts_config = model_config['marts']
         if 'forecasting' in marts_config and isinstance(marts_config['forecasting'], dict):
             fc_config = marts_config['forecasting']
@@ -312,8 +312,13 @@ async def get_model_context(ctx: Context, model_name: str) -> str:
     dataset = model.config.database
     schema = model.config.schema or 'default'
     
-    # Check for dataset in various locations in project config
-    if not dataset and model_config:
+    # First check if dataset is provided via environment variable
+    env_dataset = os.getenv("BIGQUERY_DATASET")
+    if env_dataset:
+        dataset = env_dataset
+    
+    # Otherwise check for dataset in various locations in project config
+    elif not dataset and model_config:
         # Check for forecasting specific config
         if 'forecasting' in model_config:
             forecasting_config = model_config['forecasting']
@@ -616,23 +621,31 @@ async def list_available_models(ctx: Context, schema_filter: Optional[str] = Non
 @mcp.prompt()
 async def database_overview(ctx: Context) -> str:
     """
-    Provide a high-level overview of the database structure.
+    Get dbt schema context BEFORE executing SQL - provides table structures and column details.
     """
     await ensure_fresh_context()
     
     if not registry:
         return "No database context available."
     
-    return f"""You have access to a dbt project from repository: {repository_name}
+    dataset = os.getenv("BIGQUERY_DATASET", "")
+    dataset_info = f"\nBigQuery Dataset: **{dataset}**" if dataset else ""
+    
+    return f"""**DBT SCHEMA CONTEXT** - Use this information BEFORE writing SQL queries
+
+Repository: {repository_name}{dataset_info}
 
 This project contains:
-- {len(registry.project.models)} models
-- {len(registry.project.sources)} sources
+- {len(registry.project.models)} models in the marts
+- {len(registry.project.sources)} data sources
 - {len(registry.schema_index)} schemas
 
-Key commands to explore the database:
-- Use get_database_context() for a comprehensive overview
-- Use get_model_context(model_name) for specific table details
+**IMPORTANT**: This MCP provides schema/structure information only.
+After getting context here, use the appropriate SQL execution MCP (BigQuery/Postgres) to run queries.
+
+Key commands to explore the database structure:
+- Use get_database_context() for comprehensive table overview
+- Use get_model_context(model_name) for specific table details with column info
 - Use search_models(query) to find relevant tables
 - Use get_model_lineage(model_name) to understand data flow
 - Use get_column_info(model_name, column_name) for column details

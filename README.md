@@ -11,6 +11,32 @@ A FastMCP-based context provider that delivers rich database structure informati
 - 🚀 **Built with FastMCP** for simple, efficient tool and prompt definitions
 - ⚡ **Smart caching** with configurable TTL for optimal performance
 
+## Required Workflow
+
+**⚠️ CRITICAL: This MCP must be consulted BEFORE any SQL execution**
+
+The dbt-context-provider contains essential business logic and constraints that are NOT available in database INFORMATION_SCHEMA:
+- ✅ **Accepted column values** from dbt tests (e.g., status: 'active'|'pending'|'closed')
+- ✅ **Business constraints** and validation rules
+- ✅ **Column relationships** and dependencies
+- ✅ **Custom schema locations** from generate_schema_name macros
+- ✅ **Data quality rules** from dbt tests
+
+### Correct Query Workflow
+
+1. **SEARCH** - Use `search_models()` to find relevant tables
+2. **UNDERSTAND** - Use `get_model_context()` for each table to get column details
+3. **INSPECT** - Use `get_column_info()` for columns with business logic
+4. **EXECUTE** - Only after steps 1-3, write and run SQL queries
+
+### What Happens If You Skip This MCP
+
+- ❌ Incorrect filter conditions due to unknown enum values
+- ❌ Missing critical business logic constraints
+- ❌ Querying wrong schemas or datasets
+- ❌ Invalid JOIN conditions
+- ❌ Incomplete or incorrect query results
+
 ## Key Features
 
 - **Repository-Specific Configuration**: Each instance targets specific dbt models via glob patterns

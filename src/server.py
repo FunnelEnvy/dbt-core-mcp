@@ -245,9 +245,10 @@ async def ensure_fresh_context():
 @mcp.tool()
 async def get_database_context(ctx: Context) -> str:
     """
-    Get comprehensive database structure context for the configured dbt project.
-    Returns formatted information about models, columns, relationships, and tests.
-    Automatically refreshes from GitHub if cache is stale.
+    ALWAYS use this FIRST before writing any SQL queries.
+    Returns comprehensive database structure with business logic, constraints, and accepted values
+    that are NOT available in database INFORMATION_SCHEMA.
+    Includes column relationships, data quality rules, and test-validated values.
     """
     await ensure_fresh_context()
     
@@ -321,8 +322,10 @@ async def get_database_context(ctx: Context) -> str:
 @mcp.tool()
 async def get_model_context(ctx: Context, model_name: str) -> str:
     """
-    Get detailed context about a specific dbt model including its columns,
-    data types, relationships, tests, and documentation.
+    REQUIRED before querying this table - provides critical column details.
+    Returns column types, constraints, accepted values (from tests), relationships,
+    and business logic NOT available in database metadata.
+    Skipping this step will result in incorrect queries.
     
     Args:
         model_name: Name of the dbt model to get context for
@@ -472,8 +475,9 @@ async def search_models(
     filter_materialization: Optional[str] = None
 ) -> str:
     """
-    Search for models by name, description, columns, or tags.
-    Useful for finding relevant tables when constructing queries.
+    Use this FIRST to find tables before writing SQL queries.
+    Searches model names, descriptions, columns, and tags to identify relevant tables.
+    Always search for models before attempting to query them directly.
     
     Args:
         query: Search term to look for in model names, descriptions, columns
@@ -709,28 +713,43 @@ async def database_overview(ctx: Context) -> str:
             if database:
                 dataset_info = f"\nDatabase: **{database}**"
     
-    return f"""**DBT SCHEMA CONTEXT** - Use this information BEFORE writing SQL queries
+    return f"""**CRITICAL: DBT SCHEMA CONTEXT - REQUIRED FIRST STEP**
 
 Repository: {repository_name}{dataset_info}
 Target: {target_name}
 
+⚠️ **MANDATORY WORKFLOW - NEVER SKIP THESE STEPS:**
+1. **SEARCH** - Use search_models() to find relevant tables
+2. **UNDERSTAND** - Use get_model_context() for EACH table you'll query
+3. **INSPECT** - Use get_column_info() for columns with business logic
+4. **THEN EXECUTE** - Only after steps 1-3, write and run SQL
+
+**WHY THIS IS REQUIRED:**
+This MCP contains critical information NOT available in database INFORMATION_SCHEMA:
+- ✅ Accepted column values (e.g., lifecycle_stage: forecast/override/actual)
+- ✅ Business constraints (e.g., invoice_status: invoiced/staged/due/scheduled)
+- ✅ Data quality rules from dbt tests
+- ✅ Column relationships and dependencies
+- ✅ Actual table locations with custom schema names
+
+**SKIPPING THIS WILL CAUSE:**
+- ❌ Incorrect filter conditions (unknown enum values)
+- ❌ Missing business logic constraints
+- ❌ Querying wrong schemas/datasets
+- ❌ Invalid JOIN conditions
+
 This project contains:
-- {len(registry.project.models)} models in the marts
+- {len(registry.project.models)} models with full documentation
 - {len(registry.project.sources)} data sources
 - {len(registry.schema_index)} schemas
 
-**IMPORTANT**: This MCP provides schema/structure information only.
-After getting context here, use the appropriate SQL execution MCP (BigQuery/Postgres) to run queries.
+**Example: Column Values from Tests**
+Models often have columns with specific accepted values defined in tests:
+- current_lifecycle_stage: ['forecast', 'override', 'actual']
+- invoice_status: ['invoiced', 'staged', 'due', 'scheduled', 'orphaned']
+These values are ONLY discoverable through this MCP, not INFORMATION_SCHEMA.
 
-Key commands to explore the database structure:
-- Use get_database_context() for comprehensive table overview
-- Use get_model_context(model_name) for specific table details with column info
-- Use search_models(query) to find relevant tables
-- Use get_model_lineage(model_name) to understand data flow
-- Use get_column_info(model_name, column_name) for column details
-
-The models are organized into schemas representing different data layers.
-Common patterns include staging (raw data), intermediate (transformations), and marts (business logic).
+After understanding the schema here, use the appropriate SQL execution MCP.
 """
 
 
@@ -738,6 +757,7 @@ Common patterns include staging (raw data), intermediate (transformations), and 
 async def sql_helper(ctx: Context, query_intent: str) -> str:
     """
     Get database context relevant to a specific SQL query intent.
+    MUST be used before writing SQL to understand business logic and constraints.
     
     Args:
         query_intent: Description of what the SQL query should accomplish
@@ -758,6 +778,7 @@ async def sql_helper(ctx: Context, query_intent: str) -> str:
                 relevant_models.add(model.name)
     
     output = [f"# SQL Context for: {query_intent}\n"]
+    output.append("⚠️ **REMEMBER: Never write SQL without first getting full model context!**\n")
     
     if relevant_models:
         output.append(f"## Potentially Relevant Models:")
@@ -771,13 +792,19 @@ async def sql_helper(ctx: Context, query_intent: str) -> str:
                 if model.columns:
                     col_names = [c.name for c in model.columns[:10]]
                     output.append(f"Key columns: {', '.join(col_names)}")
+                output.append("**NEXT STEP**: Call get_model_context('" + model.name + "') for full details")
     else:
         output.append("No directly relevant models found. Use search_models() to explore available tables.")
     
-    output.append("\n## Tips:")
-    output.append("- Use get_model_context(model_name) for complete column details")
-    output.append("- Check get_model_lineage(model_name) to find related tables")
-    output.append("- Use search_models(term) to find more relevant models")
+    output.append("\n## REQUIRED WORKFLOW:")
+    output.append("1. ✅ Use search_models() to find tables")
+    output.append("2. ✅ Use get_model_context() for FULL column details including:")
+    output.append("   - Accepted values for enum columns")
+    output.append("   - Business constraints from tests")
+    output.append("   - Data types and relationships")
+    output.append("3. ✅ Use get_column_info() for specific column constraints")
+    output.append("4. ✅ ONLY THEN write your SQL query")
+    output.append("\n**WARNING**: Database INFORMATION_SCHEMA lacks business logic - you MUST use this MCP!")
     
     return "\n".join(output)
 

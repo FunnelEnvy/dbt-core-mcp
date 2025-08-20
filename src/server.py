@@ -24,10 +24,7 @@ from src.cache import get_cache_manager
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP application
-mcp = FastMCP(
-    name="dbt-context-provider",
-    description="Provides rich database structure context from dbt projects"
-)
+mcp = FastMCP(name="dbt-context-provider")
 
 # Global state
 registry: Optional[ModelRegistry] = None

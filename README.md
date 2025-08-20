@@ -155,7 +155,15 @@ Add to your Claude Desktop configuration file:
     "dbt-context": {
       "command": "docker",
       "args": [
-        "run", "--rm", "-i",
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_REPOSITORY",
+        "-e",
+        "DBT_SCHEMA_PATTERNS",
         "ghcr.io/funnelenvy/dbt-core-mcp:latest"
       ],
       "env": {
@@ -176,8 +184,19 @@ Run multiple instances for different model subsets:
 {
   "mcpServers": {
     "dbt-forecasting": {
-      "command": "python",
-      "args": ["/path/to/dbt-core-mcp/main.py"],
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_REPOSITORY",
+        "-e",
+        "DBT_SCHEMA_PATTERNS",
+        "ghcr.io/funnelenvy/dbt-core-mcp:latest"
+      ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "FunnelEnvy/funnelenvy_dbt",
@@ -185,8 +204,19 @@ Run multiple instances for different model subsets:
       }
     },
     "dbt-reform": {
-      "command": "python",
-      "args": ["/path/to/dbt-core-mcp/main.py"],
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_REPOSITORY",
+        "-e",
+        "DBT_SCHEMA_PATTERNS",
+        "ghcr.io/funnelenvy/dbt-core-mcp:latest"
+      ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "FunnelEnvy/funnelenvy_dbt",

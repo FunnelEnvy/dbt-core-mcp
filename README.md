@@ -15,6 +15,8 @@ A FastMCP-based context provider that delivers rich database structure informati
 
 - **Repository-Specific Configuration**: Each instance targets specific dbt models via glob patterns
 - **Automatic GitHub Sync**: Fetches and caches dbt files, refreshing based on TTL
+- **Profile-Aware**: Parses profiles.yml to extract database/dataset configuration
+- **Database Agnostic**: Works with BigQuery, Postgres, Redshift, Snowflake, and more
 - **Context-Optimized Tools**: Purpose-built tools for providing database context to LLMs
 - **Rich Model Information**: Complete details on columns, data types, tests, and relationships
 - **Intelligent Search**: Find relevant models and columns for query construction
@@ -63,7 +65,8 @@ DBT_SCHEMA_PATTERNS=models/**/*.yml
 
 # Optional
 DBT_PROJECT_PATH=dbt_project.yml  # Path to dbt_project.yml
-BIGQUERY_DATASET=your_dataset     # BigQuery dataset name (for BigQuery projects)
+DBT_PROFILES_PATH=profiles.yml    # Path to profiles.yml
+DBT_TARGET=prod                   # Target to use from profiles.yml (default: prod)
 CACHE_TTL_MINUTES=60               # How often to check for updates
 LOG_LEVEL=INFO
 ```
@@ -141,8 +144,7 @@ Add to your Claude Desktop configuration file:
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
-        "DBT_SCHEMA_PATTERNS": "models/**/*.yml",
-        "BIGQUERY_DATASET": "your_dataset"
+        "DBT_SCHEMA_PATTERNS": "models/**/*.yml"
       }
     }
   }
@@ -171,8 +173,7 @@ Add to your Claude Desktop configuration file:
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
         "GITHUB_REPOSITORY": "YourOrg/your-dbt-repo",
-        "DBT_SCHEMA_PATTERNS": "models/**/*.yml",
-        "BIGQUERY_DATASET": "your_dataset"
+        "DBT_SCHEMA_PATTERNS": "models/**/*.yml"
       }
     }
   }

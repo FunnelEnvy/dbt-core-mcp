@@ -32,13 +32,15 @@ github_client: Optional[Github] = None
 repository_name: Optional[str] = None
 schema_patterns: List[str] = []
 project_path: str = "dbt_project.yml"
+profiles_path: str = "profiles.yml"
+target_name: Optional[str] = None
 last_sync: Optional[datetime] = None
 cache_manager = get_cache_manager()
 
 
 def initialize_github():
     """Initialize GitHub client with PAT."""
-    global github_client, repository_name, schema_patterns, project_path
+    global github_client, repository_name, schema_patterns, project_path, profiles_path, target_name
     
     token = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
     if not token:
@@ -50,6 +52,8 @@ def initialize_github():
     
     schema_patterns = os.getenv("DBT_SCHEMA_PATTERNS", "models/**/*.yml").split(",")
     project_path = os.getenv("DBT_PROJECT_PATH", "dbt_project.yml")
+    profiles_path = os.getenv("DBT_PROFILES_PATH", "profiles.yml")
+    target_name = os.getenv("DBT_TARGET", "prod")  # Default to prod target
     
     github_client = Github(token)
     repository_name = repo
@@ -57,6 +61,8 @@ def initialize_github():
     logger.info(f"Initialized GitHub client for repository: {repository_name}")
     logger.info(f"Schema patterns: {schema_patterns}")
     logger.info(f"Project path: {project_path}")
+    logger.info(f"Profiles path: {profiles_path}")
+    logger.info(f"Target: {target_name}")
 
 
 async def fetch_from_github(path: str) -> Optional[str]:
@@ -150,6 +156,20 @@ async def sync_from_github() -> bool:
         # Parse project
         project = DbtParser.parse_dbt_project(project_content)
         
+        # Fetch and parse profiles.yml if available
+        profile_config = None
+        profiles_content = await fetch_from_github(profiles_path)
+        if profiles_content:
+            try:
+                profiles_data = yaml.safe_load(profiles_content)
+                if project.config.profile and project.config.profile in profiles_data:
+                    profile_data = profiles_data[project.config.profile]
+                    if 'outputs' in profile_data and target_name in profile_data['outputs']:
+                        profile_config = profile_data['outputs'][target_name]
+                        logger.info(f"Loaded profile config for target '{target_name}': {profile_config.get('type', 'unknown')} database")
+            except Exception as e:
+                logger.warning(f"Failed to parse profiles.yml: {e}")
+        
         # Fetch schema files
         schema_files = await fetch_files_matching_patterns()
         logger.info(f"Fetched {len(schema_files)} schema files")
@@ -179,6 +199,11 @@ async def sync_from_github() -> bool:
         
         # Build registry
         registry = DbtParser.build_model_registry(project)
+        
+        # Store profile config in registry for later use
+        if profile_config:
+            registry.profile_config = profile_config
+        
         last_sync = datetime.now()
         
         logger.info(f"Sync complete. Loaded {len(all_models)} models")
@@ -230,12 +255,16 @@ async def get_database_context(ctx: Context) -> str:
     # Project overview
     context_parts.append(f"# Database Context: {repository_name}\n")
     
-    # Extract dataset configuration
+    # Extract dataset configuration from profiles if available
     model_config = registry.project.config.models or {}
-    dataset_info = os.getenv("BIGQUERY_DATASET")  # Check env var first
+    dataset_info = None
     
-    # If not in env, look for dataset configuration in project
-    if not dataset_info and 'marts' in model_config and isinstance(model_config['marts'], dict):
+    # Will be populated from profiles.yml parsing
+    if hasattr(registry, 'profile_config') and registry.profile_config:
+        dataset_info = registry.profile_config.get('dataset') or registry.profile_config.get('database')
+    
+    # Otherwise look for dataset configuration in project
+    elif 'marts' in model_config and isinstance(model_config['marts'], dict):
         marts_config = model_config['marts']
         if 'forecasting' in marts_config and isinstance(marts_config['forecasting'], dict):
             fc_config = marts_config['forecasting']
@@ -305,19 +334,26 @@ async def get_model_context(ctx: Context, model_name: str) -> str:
     if model.description:
         context_parts.append(f"\n{model.description}")
     
-    # Configuration - Extract dataset from project config
+    # Configuration - Extract dataset from profiles and project config
     model_config = registry.project.config.models or {}
     
-    # Navigate through nested config to find dataset
-    dataset = model.config.database
+    # Get dataset/database from profile config if available
+    dataset = None
     schema = model.config.schema or 'default'
     
-    # First check if dataset is provided via environment variable
-    env_dataset = os.getenv("BIGQUERY_DATASET")
-    if env_dataset:
-        dataset = env_dataset
+    if hasattr(registry, 'profile_config') and registry.profile_config:
+        # Different databases use different terms
+        dataset = registry.profile_config.get('dataset')  # BigQuery
+        if not dataset:
+            dataset = registry.profile_config.get('database')  # Postgres/Redshift/Snowflake
+        if not dataset:
+            dataset = registry.profile_config.get('schema')  # Some configs
     
-    # Otherwise check for dataset in various locations in project config
+    # Override with model-specific database if set
+    if model.config.database:
+        dataset = model.config.database
+    
+    # Check for dataset in various locations in project config if still not found
     elif not dataset and model_config:
         # Check for forecasting specific config
         if 'forecasting' in model_config:
@@ -349,12 +385,27 @@ async def get_model_context(ctx: Context, model_name: str) -> str:
     context_parts.append(f"- Materialization: {model.get_materialization()}")
     context_parts.append(f"- Schema: {schema}")
     
-    # Provide full BigQuery table path
+    # Provide full table path based on database type
     if dataset:
-        context_parts.append(f"- Dataset: {dataset}")
-        context_parts.append(f"- Full BigQuery Table Path: `{dataset}.{schema}.{model.name}`")
+        # Determine database type from profile
+        db_type = "database"
+        if hasattr(registry, 'profile_config') and registry.profile_config:
+            profile_type = registry.profile_config.get('type', '').lower()
+            if profile_type == 'bigquery':
+                db_type = "Dataset"
+                context_parts.append(f"- Dataset: {dataset}")
+                context_parts.append(f"- Full Table Path: `{dataset}.{schema}.{model.name}`")
+            elif profile_type in ['postgres', 'redshift', 'snowflake']:
+                db_type = "Database"
+                context_parts.append(f"- Database: {dataset}")
+                context_parts.append(f"- Full Table Path: `{dataset}.{schema}.{model.name}`")
+            else:
+                context_parts.append(f"- Database/Dataset: {dataset}")
+                context_parts.append(f"- Full Table Path: `{dataset}.{schema}.{model.name}`")
+        else:
+            context_parts.append(f"- Database/Dataset: {dataset}")
+            context_parts.append(f"- Full Table Path: `{dataset}.{schema}.{model.name}`")
     else:
-        context_parts.append(f"- Database: {model.config.database or 'default'}")
         context_parts.append(f"- Full Table Path: {model.get_full_name()}")
     
     # Tags
@@ -628,12 +679,23 @@ async def database_overview(ctx: Context) -> str:
     if not registry:
         return "No database context available."
     
-    dataset = os.getenv("BIGQUERY_DATASET", "")
-    dataset_info = f"\nBigQuery Dataset: **{dataset}**" if dataset else ""
+    # Get dataset/database info from profile
+    dataset_info = ""
+    if hasattr(registry, 'profile_config') and registry.profile_config:
+        profile_type = registry.profile_config.get('type', '').lower()
+        if profile_type == 'bigquery':
+            dataset = registry.profile_config.get('dataset')
+            if dataset:
+                dataset_info = f"\nBigQuery Dataset: **{dataset}**"
+        elif profile_type in ['postgres', 'redshift', 'snowflake']:
+            database = registry.profile_config.get('database')
+            if database:
+                dataset_info = f"\nDatabase: **{database}**"
     
     return f"""**DBT SCHEMA CONTEXT** - Use this information BEFORE writing SQL queries
 
 Repository: {repository_name}{dataset_info}
+Target: {target_name}
 
 This project contains:
 - {len(registry.project.models)} models in the marts

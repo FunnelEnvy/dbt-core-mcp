@@ -229,6 +229,24 @@ async def get_database_context(ctx: Context) -> str:
     
     # Project overview
     context_parts.append(f"# Database Context: {repository_name}\n")
+    
+    # Extract dataset configuration
+    model_config = registry.project.config.models or {}
+    dataset_info = None
+    
+    # Look for dataset configuration
+    if 'marts' in model_config and isinstance(model_config['marts'], dict):
+        marts_config = model_config['marts']
+        if 'forecasting' in marts_config and isinstance(marts_config['forecasting'], dict):
+            fc_config = marts_config['forecasting']
+            if '+dataset' in fc_config:
+                dataset_info = fc_config['+dataset']
+            elif 'dataset' in fc_config:
+                dataset_info = fc_config['dataset']
+    
+    if dataset_info:
+        context_parts.append(f"**BigQuery Dataset**: `{dataset_info}`")
+    
     context_parts.append(f"Total Models: {len(registry.project.models)}")
     context_parts.append(f"Total Sources: {len(registry.project.sources)}")
     
@@ -287,12 +305,52 @@ async def get_model_context(ctx: Context, model_name: str) -> str:
     if model.description:
         context_parts.append(f"\n{model.description}")
     
-    # Configuration
+    # Configuration - Extract dataset from project config
+    model_config = registry.project.config.models or {}
+    
+    # Navigate through nested config to find dataset
+    dataset = model.config.database
+    schema = model.config.schema or 'default'
+    
+    # Check for dataset in various locations in project config
+    if not dataset and model_config:
+        # Check for forecasting specific config
+        if 'forecasting' in model_config:
+            forecasting_config = model_config['forecasting']
+            if isinstance(forecasting_config, dict):
+                if '+dataset' in forecasting_config:
+                    dataset = forecasting_config['+dataset']
+                elif 'dataset' in forecasting_config:
+                    dataset = forecasting_config['dataset']
+        
+        # Check for marts specific config
+        if 'marts' in model_config:
+            marts_config = model_config['marts']
+            if isinstance(marts_config, dict):
+                if '+dataset' in marts_config:
+                    dataset = marts_config['+dataset']
+                elif 'dataset' in marts_config:
+                    dataset = marts_config['dataset']
+                # Check for forecasting within marts
+                if 'forecasting' in marts_config:
+                    fc_config = marts_config['forecasting']
+                    if isinstance(fc_config, dict):
+                        if '+dataset' in fc_config:
+                            dataset = fc_config['+dataset']
+                        elif 'dataset' in fc_config:
+                            dataset = fc_config['dataset']
+    
     context_parts.append(f"\n## Configuration:")
     context_parts.append(f"- Materialization: {model.get_materialization()}")
-    context_parts.append(f"- Schema: {model.config.schema or 'default'}")
-    context_parts.append(f"- Database: {model.config.database or 'default'}")
-    context_parts.append(f"- Full Name: {model.get_full_name()}")
+    context_parts.append(f"- Schema: {schema}")
+    
+    # Provide full BigQuery table path
+    if dataset:
+        context_parts.append(f"- Dataset: {dataset}")
+        context_parts.append(f"- Full BigQuery Table Path: `{dataset}.{schema}.{model.name}`")
+    else:
+        context_parts.append(f"- Database: {model.config.database or 'default'}")
+        context_parts.append(f"- Full Table Path: {model.get_full_name()}")
     
     # Tags
     all_tags = list(set(model.tags + model.config.tags))
